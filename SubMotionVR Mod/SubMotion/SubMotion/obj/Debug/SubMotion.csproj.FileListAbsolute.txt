@@ -1,0 +1,2 @@
+C:\Users\WingFx\Desktop\SubMotionVR Mod\SubMotion\SubMotion\obj\Debug\SubMotion.csprojAssemblyReference.cache
+C:\Users\WingFx\Desktop\SubMotionVR Mod\SubMotion\SubMotion\obj\Debug\SubMotion.csproj.CoreCompileInputs.cache
