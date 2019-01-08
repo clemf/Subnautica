@@ -1,0 +1,11 @@
+{
+  "Id": "RunningWithTools",
+  "DisplayName": "Running With Tools",
+  "Author": "Musashi",
+  "Version": "1.0",
+  "Requires": [ ],
+  "Enable": true,
+  "AssemblyName": "RunningWithTools.dll",
+  "EntryMethod": "RunningWithTools.MainPatcher.Patch",
+  "Config": {}
+}
