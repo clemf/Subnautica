@@ -4,7 +4,7 @@ using System.Collections;
 using System.Reflection;
 using RootMotion.FinalIK;
 using UnityEngine;
-using UnityEngine.VR;x
+using UnityEngine.VR;
 using UWE;
 
 namespace SubMotion
@@ -13,7 +13,7 @@ namespace SubMotion
     [HarmonyPatch("Update")]
     internal class ArmsController_Update_Patch
     {
-        
+
          [HarmonyPostfix]
         public void Postfix(ArmsController __instance, FullBodyBipedChain ik)
         {
@@ -42,7 +42,7 @@ namespace SubMotion
     [HarmonyPatch("Reconfigure")]
     internal class ArmsController_Reconfigure_Patch
     {
-       
+
         [HarmonyPrefix]
         public void Prefix(ArmsController __instance, PlayerTool tool)
         {
