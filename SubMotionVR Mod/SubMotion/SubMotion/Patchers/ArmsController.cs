@@ -17,23 +17,32 @@ namespace SubMotion
          [HarmonyPostfix]
         public void Postfix(ArmsController __instance, FullBodyBipedChain ik)
         {
-            if (Player.main.motorMode != Player.MotorMode.Vehicle)
-            {
-                GameObject rightController = new GameObject("rightController");
-                rightController.transform.parent = __instance.player.camRoot.transform;
-                rightController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.RightHand) + new Vector3(0f, -0.02f, -0.2f);
-                rightController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.RightHand);
-                rightController.transform.localRotation *= Quaternion.Euler(35f, 190f, 270f);
-                __instance.ik.solver.rightHandEffector.target = rightController.transform;
-                GameObject leftController = new GameObject("leftController");
-                leftController.transform.parent = __instance.player.camRoot.transform;
-                leftController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.LeftHand) + new Vector3(0f, 0.02f, -0.2f);
-                leftController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.LeftHand);
-                leftController.transform.localRotation *= Quaternion.Euler(270f, 90f, 0f);
-                __instance.ik.solver.leftHandEffector.target = leftController.transform;
-            }
-        }
-    }
+        if ((VRSettings.enabled && Player.main.motorMode != Player.MotorMode.Vehicle && !this.player.cinematicModeActive) || this.pda.isActiveAndEnabled)
+		{
+			GameObject rightController = new GameObject("rightController");
+			GameObject leftController = new GameObject("leftController");
+			InventoryItem heldItem = Inventory.main.quickSlots.heldItem;
+			rightController.transform.parent = this.player.camRoot.transform;
+			rightController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.RightHand) + new Vector3(0f, -0.02f, -0.2f);
+			rightController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.RightHand) * Quaternion.Euler(35f, 190f, 270f);
+			this.ik.solver.rightHandEffector.target = rightController.transform;
+			leftController.transform.parent = this.player.camRoot.transform;
+			leftController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.LeftHand) + new Vector3(0f, 0.02f, -0.2f);
+			leftController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.LeftHand) * Quaternion.Euler(270f, 90f, 0f);
+			this.ik.solver.leftHandEffector.target = leftController.transform;
+			if (heldItem.item.GetComponent<PropulsionCannon>())
+			{
+				this.ik.solver.leftHandEffector.target = null;
+				this.ik.solver.rightHandEffector.target = null;
+				return;
+			}
+			if (heldItem.item.GetComponent<StasisRifle>())
+			{
+				this.ik.solver.leftHandEffector.target = null;
+				this.ik.solver.rightHandEffector.target = null;
+			}
+		}
+
 
     [HarmonyPatch(typeof(ArmsController))]
     [HarmonyPatch("Reconfigure")]
