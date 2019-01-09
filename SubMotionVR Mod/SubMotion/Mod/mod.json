@@ -1,0 +1,11 @@
+{
+  "Id": "SubMotionVR",
+  "DisplayName": "Subnautica VR Motion Control",
+  "Author": "Musashi",
+  "Version": "1.0",
+  "Requires": ["0Harmony.dll"],
+  "Enable": true,
+  "AssemblyName": "SubMotion.dll",
+  "EntryMethod": "SubMotion.MainPatcher.Patch",
+  "Config": {}
+}
