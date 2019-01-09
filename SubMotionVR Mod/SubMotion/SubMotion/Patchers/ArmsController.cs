@@ -15,7 +15,7 @@ namespace SubMotion
     {
 
          [HarmonyPostfix]
-        public void Postfix(ArmsController __instance, FullBodyBipedChain ik)
+        public void Postfix(ArmsController __instance, FullBodyBipedChain ik, PlayerTool tool)
         {
         if ((VRSettings.enabled && Player.main.motorMode != Player.MotorMode.Vehicle && !this.player.cinematicModeActive) || this.pda.isActiveAndEnabled)
 		{
