@@ -1,11 +1,7 @@
 using Harmony;
-using System;
-using System.Collections;
-using System.Reflection;
 using RootMotion.FinalIK;
 using UnityEngine;
 using UnityEngine.VR;
-using UWE;
 
 namespace SubMotion
 {
@@ -14,35 +10,39 @@ namespace SubMotion
         public GameObject rightController;
         public GameObject leftController;
         public ArmsController armsController;
-        
+        public Player player;
+        public FullBodyBipedIK ik;
+        public PDA pda;
 
-        private static VRHandsController __instance;
-        public static VRHandsController instance
-        {
+        private static VRHandsController _main;
+        public static VRHandsController main {
             get {
-                if (__instance == null)
-                {
-                    __instance = new VRHandsController();
+                if (_main == null) {
+                    _main = new VRHandsController();
                 }
-                return __instance;
+                return _main;
             }
         }
 
-        public void Initialize(Transform parent)
+        public void Initialize(ArmsController controller)
         {
-            this.rightController = new GameObject("rightController");
-            this.rightController.transform.parent = parent;
+            armsController = controller;
+            player = global::Utils.GetLocalPlayerComp();
+            ik = controller.GetComponent<FullBodyBipedIK>();
+            pda = player.GetPDA();
 
-            this.leftController = new GameObject("leftController");
-            this.leftController.transform.parent = parent;
+            rightController = new GameObject("rightController");
+            rightController.transform.parent = player.camRoot.transform;
+
+            leftController = new GameObject("leftController");
+            leftController.transform.parent = player.camRoot.transform;
         }
 
-        public void UpdateHandPositions(FullBodyBipedIK ik)
-        {
+        public void UpdateHandPositions() {
             InventoryItem heldItem = Inventory.main.quickSlots.heldItem;
 
-            this.rightController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.RightHand) + new Vector3(0f, -0.13f, -0.14f);
-            this.rightController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.RightHand) * Quaternion.Euler(35f, 190f, 270f);
+            rightController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.RightHand) + new Vector3(0f, -0.13f, -0.14f);
+            rightController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.RightHand) * Quaternion.Euler(35f, 190f, 270f);
 
             leftController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.LeftHand) + new Vector3(0f, -0.13f, -0.14f);
             leftController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.LeftHand) * Quaternion.Euler(270f, 90f, 0f);
@@ -63,87 +63,23 @@ namespace SubMotion
 
     [HarmonyPatch(typeof(ArmsController))]
     [HarmonyPatch("Start")]
-    internal class ArmsController_Start_Patch
+    class ArmsController_Start_Patch
     {
-        private static Player _player;
-        public static Player player
-        {
-            get
-            {
-                if (_player == null)
-                {
-                    _player = global::Utils.GetLocalPlayerComp();
-                }
-                return _player;
-            }
-        }
         [HarmonyPostfix]
         public static void PostFix(ArmsController __instance)
         {
-            
-            if (!VRSettings.enabled)
-            {
+            if (!VRSettings.enabled) {
                 return;
             }
-            {
-                VRHandsController.instance.Initialize(player.camRoot.gameObject.transform);
-            }
+
+            VRHandsController.main.Initialize(__instance);
         }
     }
 
     [HarmonyPatch(typeof(ArmsController))]
     [HarmonyPatch("Update")]
-    internal class ArmsController_Update_Patch
+    class ArmsController_Update_Patch
     {
-        private static Player _player;
-        public static Player player
-        {
-            get
-            {
-                if (_player == null)
-                {
-                    _player = global::Utils.GetLocalPlayerComp();
-                }
-                return _player;
-            }
-        }
-        private static Component _component;
-        public static Component component
-        {
-            get
-            {
-                if (_component == null)
-                {
-                    _component = new Component();
-                }
-                return _component;
-            }
-        }
-        private static FullBodyBipedIK ___ik;
-        public static FullBodyBipedIK ik
-        {
-            get
-            {
-                if (___ik == null)
-                {
-                    ___ik = _component.GetComponent<FullBodyBipedIK>();
-                }
-                return ___ik;
-            }
-        }
-
-        private static PDA ___pda;
-        public static PDA pda
-        {
-            get
-            {
-                if (___pda == null)
-                {
-                    ___pda = player.GetPDA();
-                }
-                return ___pda;
-            }
-        }
 
         [HarmonyPostfix]
         public static void Postfix(ArmsController __instance)
@@ -152,103 +88,48 @@ namespace SubMotion
                 return;
             }
 
+            PDA pda = VRHandsController.main.pda;
+            Player player = VRHandsController.main.player;
             if ((Player.main.motorMode != Player.MotorMode.Vehicle && !player.cinematicModeActive) || pda.isActiveAndEnabled)
             {
-                VRHandsController.instance.UpdateHandPositions(ik);
+                VRHandsController.main.UpdateHandPositions();
             }
         }
     }
 
     [HarmonyPatch(typeof(ArmsController))]
     [HarmonyPatch("Reconfigure")]
-    internal class ArmsController_Reconfigure_Patch
+    class ArmsController_Reconfigure_Patch
     {
-        private static Player _player;
-        public static Player player
-        {
-            get
-            {
-                if (_player == null)
-                {
-                    _player = global::Utils.GetLocalPlayerComp();
-                }
-                return _player;
-            }
-        }
-        private static PDA ___pda;
-        public static PDA pda
-        {
-            get
-            {
-                if (___pda == null)
-                {
-                    ___pda = player.GetPDA();
-                }
-                return ___pda;
-            }
-        }
-        private static FullBodyBipedIK ___ik;
-        public static FullBodyBipedIK ik
-        {
-            get
-            {
-                if (___ik == null)
-                {
-                    ___ik = ik.GetComponent<FullBodyBipedIK>();
-                }
-                return ___ik;
-            }
-        }
-
-        private static Transform leftWorldTarget;
-        public static Transform leftTarget
-        {
-            get
-            {
-                if (leftWorldTarget == null)
-                {
-                    leftWorldTarget = leftTarget;
-                }
-                return leftWorldTarget;
-            }
-        }
-
-        private static Transform rightWorldTarget;
-        public static Transform rightTarget
-        {
-            get
-            {
-                if (rightWorldTarget == null)
-                {
-                    rightWorldTarget = rightTarget;
-                }
-                return rightWorldTarget;
-            }
-        }
-
         [HarmonyPrefix]
         public static void Prefix(ArmsController __instance, PlayerTool tool)
         {
-            ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = __instance.leftHandElbow;
-            ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 1f;
+            FullBodyBipedIK ik = VRHandsController.main.ik;
+
+            ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = __instance.leftHandElbow;
+            ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 1f;
             if (tool == null)
             {
-                Traverse.Create(__instance).Field("leftAim").Field("shouldAim").SetValue(false);
-                Traverse.Create(__instance).Field("rightAim").Field("shouldAim").SetValue(false);
+                Traverse tInstance = Traverse.Create(__instance);
+                tInstance.Field("leftAim").Field("shouldAim").SetValue(false);
+                tInstance.Field("rightAim").Field("shouldAim").SetValue(false);
 
-                ___ik.solver.leftHandEffector.target = null;
-                ___ik.solver.rightHandEffector.target = null;
-                if (!___pda.isActiveAndEnabled)
+                ik.solver.leftHandEffector.target = null;
+                ik.solver.rightHandEffector.target = null;
+                if (!VRHandsController.main.pda.isActiveAndEnabled)
                 {
+                    Transform leftWorldTarget = tInstance.Field<Transform>("leftWorldTarget").Value;
                     if (leftWorldTarget)
                     {
-                        ___ik.solver.leftHandEffector.target = leftTarget;
-                        ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = null;
-                        ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 0f;
+                        ik.solver.leftHandEffector.target = leftWorldTarget;
+                        ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = null;
+                        ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 0f;
                     }
+
+                    Transform rightWorldTarget = tInstance.Field<Transform>("rightWorldTarget").Value;
                     if (rightWorldTarget)
                     {
-                        ___ik.solver.rightHandEffector.target = rightTarget;
+                        ik.solver.rightHandEffector.target = rightWorldTarget;
                         return;
                     }
                 }
