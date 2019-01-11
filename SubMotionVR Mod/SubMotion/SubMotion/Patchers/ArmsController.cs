@@ -19,17 +19,14 @@ namespace SubMotion
         public static VRHandsController instance {
             get {
                 if (_instance == null) {
-                    _instance = new GameObject("VRHandsController");
+                    _instance = new VRHandsController();
                 }
                 return _instance;
             }
         }
 
-        protected void Initialize(ArmsController _armsController)
+        public void Initialize(Transform parent)
         {
-            this.armsController = _armsController;
-            Transform parent = this.armsController.player.camRoot.transform;
-
             this.rightController = new GameObject("rightController");
             this.rightController.transform.parent = parent;
 
@@ -37,7 +34,7 @@ namespace SubMotion
             this.leftController.transform.parent = parent;
         }
 
-        public void UpdateHandPositions() {
+        public void UpdateHandPositions(FullBodyBipedIK ik) {
             InventoryItem heldItem = Inventory.main.quickSlots.heldItem;
 
             this.rightController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.RightHand) + new Vector3(0f, -0.13f, -0.14f);
@@ -47,14 +44,14 @@ namespace SubMotion
             leftController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.LeftHand) * Quaternion.Euler(270f, 90f, 0f);
 
             if (heldItem.item.GetComponent<PropulsionCannon>()) {
-                __instance.ik.solver.leftHandEffector.target = null;
-                __instance.ik.solver.rightHandEffector.target = null;
+                ik.solver.leftHandEffector.target = null;
+                ik.solver.rightHandEffector.target = null;
             } else if (heldItem.item.GetComponent<StasisRifle>()) {
-                __instance.ik.solver.leftHandEffector.target = null;
-                __instance.ik.solver.rightHandEffector.target = null;
+                ik.solver.leftHandEffector.target = null;
+                ik.solver.rightHandEffector.target = null;
             } else {
-                __instance.ik.solver.leftHandEffector.target = leftController.transform;
-                __instance.ik.solver.rightHandEffector.target = rightController.transform;
+                ik.solver.leftHandEffector.target = leftController.transform;
+                ik.solver.rightHandEffector.target = rightController.transform;
             }
         }
     }
@@ -65,13 +62,13 @@ namespace SubMotion
     internal class ArmsController_Start_Patch
     {
         [HarmonyPostfix]
-        public void PostFix(ArmsController __instance)
+        public void PostFix(ArmsController __instance, Player ___player)
         {
             if (!VRSettings.enabled) {
                 return;
             }
 
-            VRHandsController.instance.Initialize(__instance);
+            VRHandsController.instance.Initialize(___player.camRoot.transform);
         }
     }
 
@@ -81,15 +78,15 @@ namespace SubMotion
     {
 
         [HarmonyPostfix]
-        public void Postfix(ArmsController __instance, FullBodyBipedChain ik, PlayerTool tool)
+        public void Postfix(ArmsController __instance, FullBodyBipedIK ___ik, PDA ___pda, Player ___player)
         {
             if (!VRSettings.enabled) {
                 return;
             }
 
-            if ((Player.main.motorMode != Player.MotorMode.Vehicle && !__instance.player.cinematicModeActive) || __instance.pda.isActiveAndEnabled)
+            if ((Player.main.motorMode != Player.MotorMode.Vehicle && !___player.cinematicModeActive) || ___pda.isActiveAndEnabled)
             {
-                VRHandsController.instance.UpdateHandPositions();
+                VRHandsController.instance.UpdateHandPositions(___ik);
             }
         }
     }
@@ -98,29 +95,29 @@ namespace SubMotion
     [HarmonyPatch("Reconfigure")]
     internal class ArmsController_Reconfigure_Patch
     {
-
         [HarmonyPrefix]
-        public void Prefix(ArmsController __instance, PlayerTool tool)
+        public void Prefix(ArmsController __instance, PlayerTool tool, FullBodyBipedIK ___ik, PDA ___pda, Transform ___leftWorldTarget, Transform ___rightWorldTarget)
         {
-            __instance.ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = __instance.leftHandElbow;
-            __instance.ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 1f;
+            ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = __instance.leftHandElbow;
+            ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 1f;
             if (tool == null)
             {
-                __instance.leftAim.shouldAim = false;
-                __instance.rightAim.shouldAim = false;
-                __instance.ik.solver.leftHandEffector.target = null;
-                __instance.ik.solver.rightHandEffector.target = null;
-                if (!__instance.pda.isActiveAndEnabled)
+                Traverse.Create(__instance).Field("leftAim").Field("shouldAim").SetValue(false);
+                Traverse.Create(__instance).Field("rightAim").Field("shouldAim").SetValue(false);
+
+                ___ik.solver.leftHandEffector.target = null;
+                ___ik.solver.rightHandEffector.target = null;
+                if (!___pda.isActiveAndEnabled)
                 {
-                    if (__instance.leftWorldTarget)
+                    if (___leftWorldTarget)
                     {
-                        __instance.ik.solver.leftHandEffector.target = __instance.leftWorldTarget;
-                        __instance.ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = null;
-                        __instance.ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 0f;
+                        ___ik.solver.leftHandEffector.target = ___leftWorldTarget;
+                        ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = null;
+                        ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 0f;
                     }
-                    if (__instance.rightWorldTarget)
+                    if (___rightWorldTarget)
                     {
-                        __instance.ik.solver.rightHandEffector.target = __instance.rightWorldTarget;
+                        ___ik.solver.rightHandEffector.target = ___rightWorldTarget;
                         return;
                     }
                 }
