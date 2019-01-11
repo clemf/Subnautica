@@ -14,14 +14,17 @@ namespace SubMotion
         public GameObject rightController;
         public GameObject leftController;
         public ArmsController armsController;
+        
 
-        private static VRHandsController _instance;
-        public static VRHandsController instance {
+        private static VRHandsController __instance;
+        public static VRHandsController instance
+        {
             get {
-                if (_instance == null) {
-                    _instance = new VRHandsController();
+                if (__instance == null)
+                {
+                    __instance = new VRHandsController();
                 }
-                return _instance;
+                return __instance;
             }
         }
 
@@ -34,7 +37,8 @@ namespace SubMotion
             this.leftController.transform.parent = parent;
         }
 
-        public void UpdateHandPositions(FullBodyBipedIK ik) {
+        public void UpdateHandPositions(FullBodyBipedIK ik)
+        {
             InventoryItem heldItem = Inventory.main.quickSlots.heldItem;
 
             this.rightController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.RightHand) + new Vector3(0f, -0.13f, -0.14f);
@@ -61,14 +65,29 @@ namespace SubMotion
     [HarmonyPatch("Start")]
     internal class ArmsController_Start_Patch
     {
-        [HarmonyPostfix]
-        public void PostFix(ArmsController __instance, Player ___player)
+        private static Player _player;
+        public static Player player
         {
-            if (!VRSettings.enabled) {
+            get
+            {
+                if (_player == null)
+                {
+                    _player = global::Utils.GetLocalPlayerComp();
+                }
+                return _player;
+            }
+        }
+        [HarmonyPostfix]
+        public static void PostFix(ArmsController __instance)
+        {
+            
+            if (!VRSettings.enabled)
+            {
                 return;
             }
-
-            VRHandsController.instance.Initialize(___player.camRoot.transform);
+            {
+                VRHandsController.instance.Initialize(player.camRoot.gameObject.transform);
+            }
         }
     }
 
@@ -76,17 +95,66 @@ namespace SubMotion
     [HarmonyPatch("Update")]
     internal class ArmsController_Update_Patch
     {
+        private static Player _player;
+        public static Player player
+        {
+            get
+            {
+                if (_player == null)
+                {
+                    _player = global::Utils.GetLocalPlayerComp();
+                }
+                return _player;
+            }
+        }
+        private static Component _component;
+        public static Component component
+        {
+            get
+            {
+                if (_component == null)
+                {
+                    _component = new Component();
+                }
+                return _component;
+            }
+        }
+        private static FullBodyBipedIK ___ik;
+        public static FullBodyBipedIK ik
+        {
+            get
+            {
+                if (___ik == null)
+                {
+                    ___ik = _component.GetComponent<FullBodyBipedIK>();
+                }
+                return ___ik;
+            }
+        }
+
+        private static PDA ___pda;
+        public static PDA pda
+        {
+            get
+            {
+                if (___pda == null)
+                {
+                    ___pda = player.GetPDA();
+                }
+                return ___pda;
+            }
+        }
 
         [HarmonyPostfix]
-        public void Postfix(ArmsController __instance, FullBodyBipedIK ___ik, PDA ___pda, Player ___player)
+        public static void Postfix(ArmsController __instance)
         {
             if (!VRSettings.enabled) {
                 return;
             }
 
-            if ((Player.main.motorMode != Player.MotorMode.Vehicle && !___player.cinematicModeActive) || ___pda.isActiveAndEnabled)
+            if ((Player.main.motorMode != Player.MotorMode.Vehicle && !player.cinematicModeActive) || pda.isActiveAndEnabled)
             {
-                VRHandsController.instance.UpdateHandPositions(___ik);
+                VRHandsController.instance.UpdateHandPositions(ik);
             }
         }
     }
@@ -95,8 +163,71 @@ namespace SubMotion
     [HarmonyPatch("Reconfigure")]
     internal class ArmsController_Reconfigure_Patch
     {
+        private static Player _player;
+        public static Player player
+        {
+            get
+            {
+                if (_player == null)
+                {
+                    _player = global::Utils.GetLocalPlayerComp();
+                }
+                return _player;
+            }
+        }
+        private static PDA ___pda;
+        public static PDA pda
+        {
+            get
+            {
+                if (___pda == null)
+                {
+                    ___pda = player.GetPDA();
+                }
+                return ___pda;
+            }
+        }
+        private static FullBodyBipedIK ___ik;
+        public static FullBodyBipedIK ik
+        {
+            get
+            {
+                if (___ik == null)
+                {
+                    ___ik = ik.GetComponent<FullBodyBipedIK>();
+                }
+                return ___ik;
+            }
+        }
+
+        private static Transform leftWorldTarget;
+        public static Transform leftTarget
+        {
+            get
+            {
+                if (leftWorldTarget == null)
+                {
+                    leftWorldTarget = leftTarget;
+                }
+                return leftWorldTarget;
+            }
+        }
+
+        private static Transform rightWorldTarget;
+        public static Transform rightTarget
+        {
+            get
+            {
+                if (rightWorldTarget == null)
+                {
+                    rightWorldTarget = rightTarget;
+                }
+                return rightWorldTarget;
+            }
+        }
+
         [HarmonyPrefix]
-        public void Prefix(ArmsController __instance, PlayerTool tool, FullBodyBipedIK ___ik, PDA ___pda, Transform ___leftWorldTarget, Transform ___rightWorldTarget)
+        public static void Prefix(ArmsController __instance, PlayerTool tool)
         {
             ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = __instance.leftHandElbow;
             ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 1f;
@@ -109,15 +240,15 @@ namespace SubMotion
                 ___ik.solver.rightHandEffector.target = null;
                 if (!___pda.isActiveAndEnabled)
                 {
-                    if (___leftWorldTarget)
+                    if (leftWorldTarget)
                     {
-                        ___ik.solver.leftHandEffector.target = ___leftWorldTarget;
+                        ___ik.solver.leftHandEffector.target = leftTarget;
                         ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = null;
                         ___ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 0f;
                     }
-                    if (___rightWorldTarget)
+                    if (rightWorldTarget)
                     {
-                        ___ik.solver.rightHandEffector.target = ___rightWorldTarget;
+                        ___ik.solver.rightHandEffector.target = rightTarget;
                         return;
                     }
                 }
