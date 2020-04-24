@@ -1,7 +1,8 @@
 using Harmony;
 using RootMotion.FinalIK;
 using UnityEngine;
-using UnityEngine.VR;
+using UnityEngine.XR;
+using System.Collections.Generic;
 
 namespace SubMotion
 {
@@ -14,20 +15,24 @@ namespace SubMotion
         public FullBodyBipedIK ik;
         public PDA pda;
 
-        private static VRHandsController _main;
-        public static VRHandsController main {
-            get {
-                if (_main == null) {
-                    _main = new VRHandsController();
+        static VRHandsController mInstance;
+        public static VRHandsController Instance
+        {
+            get
+            {
+                if (mInstance == null)
+                {
+                    GameObject go = new GameObject();
+                    mInstance = go.AddComponent<VRHandsController>();
                 }
-                return _main;
+                return mInstance;
             }
         }
 
         public void Initialize(ArmsController controller)
         {
             armsController = controller;
-            player = global::Utils.GetLocalPlayerComp();
+            player = Utils.GetLocalPlayerComp();
             ik = controller.GetComponent<FullBodyBipedIK>();
             pda = player.GetPDA();
 
@@ -38,105 +43,132 @@ namespace SubMotion
             leftController.transform.parent = player.camRoot.transform;
         }
 
-        public void UpdateHandPositions() {
+        readonly List<XRNodeState> nodeStatesCache = new List<XRNodeState>();
+        public void UpdateHandPositions()
+        {
+            InputTracking.GetNodeStates(nodeStatesCache);
+            Vector3 rightHandPosition = new Vector3();
+            Quaternion rightHandRotation = Quaternion.identity;
+            Vector3 leftHandPosition = new Vector3();
+            Quaternion leftHandRotation = Quaternion.identity;
+            for (int i = 0; i < nodeStatesCache.Count; i++)
+            {
+                XRNodeState nodeState = nodeStatesCache[i];
+                if (nodeState.nodeType == XRNode.RightHand)
+                {
+                    nodeState.TryGetPosition(out rightHandPosition);
+                    nodeState.TryGetRotation(out rightHandRotation);
+                }
+                if (nodeState.nodeType == XRNode.LeftHand)
+                {
+                    nodeState.TryGetPosition(out leftHandPosition);
+                    nodeState.TryGetRotation(out leftHandRotation);
+                }
+            }
+
+            rightController.transform.localPosition = rightHandPosition + new Vector3(0f, -0.13f, -0.14f);
+            rightController.transform.localRotation = rightHandRotation * Quaternion.Euler(35f, 190f, 270f);
+
+            leftController.transform.localPosition = leftHandPosition + new Vector3(0f, -0.13f, -0.14f);
+            leftController.transform.localRotation = leftHandRotation * Quaternion.Euler(270f, 90f, 0f);
+
             InventoryItem heldItem = Inventory.main.quickSlots.heldItem;
-
-            rightController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.RightHand) + new Vector3(0f, -0.13f, -0.14f);
-            rightController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.RightHand) * Quaternion.Euler(35f, 190f, 270f);
-
-            leftController.transform.localPosition = InputTracking.GetLocalPosition(VRNode.LeftHand) + new Vector3(0f, -0.13f, -0.14f);
-            leftController.transform.localRotation = InputTracking.GetLocalRotation(VRNode.LeftHand) * Quaternion.Euler(270f, 90f, 0f);
-
-            if (heldItem.item.GetComponent<PropulsionCannon>()) {
+            if (heldItem?.item.GetComponent<PropulsionCannon>())
+            {
                 ik.solver.leftHandEffector.target = null;
                 ik.solver.rightHandEffector.target = null;
-            } else if (heldItem.item.GetComponent<StasisRifle>()) {
+            }
+            else if (heldItem?.item.GetComponent<StasisRifle>())
+            {
                 ik.solver.leftHandEffector.target = null;
                 ik.solver.rightHandEffector.target = null;
-            } else {
+            }
+            else
+            {
                 ik.solver.leftHandEffector.target = leftController.transform;
                 ik.solver.rightHandEffector.target = rightController.transform;
             }
         }
-    }
 
-
-    [HarmonyPatch(typeof(ArmsController))]
-    [HarmonyPatch("Start")]
-    class ArmsController_Start_Patch
-    {
-        [HarmonyPostfix]
-        public static void PostFix(ArmsController __instance)
+        [HarmonyPatch(typeof(ArmsController))]
+        [HarmonyPatch("Start")]
+        class ArmsController_Start_Patch
         {
-            if (!VRSettings.enabled) {
-                return;
-            }
-
-            VRHandsController.main.Initialize(__instance);
-        }
-    }
-
-    [HarmonyPatch(typeof(ArmsController))]
-    [HarmonyPatch("Update")]
-    class ArmsController_Update_Patch
-    {
-
-        [HarmonyPostfix]
-        public static void Postfix(ArmsController __instance)
-        {
-            if (!VRSettings.enabled) {
-                return;
-            }
-
-            PDA pda = VRHandsController.main.pda;
-            Player player = VRHandsController.main.player;
-            if ((Player.main.motorMode != Player.MotorMode.Vehicle && !player.cinematicModeActive) || pda.isActiveAndEnabled)
+            [HarmonyPostfix]
+            public static void PostFix(ArmsController __instance)
             {
-                VRHandsController.main.UpdateHandPositions();
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(ArmsController))]
-    [HarmonyPatch("Reconfigure")]
-    class ArmsController_Reconfigure_Patch
-    {
-        [HarmonyPrefix]
-        public static void Prefix(ArmsController __instance, PlayerTool tool)
-        {
-            FullBodyBipedIK ik = VRHandsController.main.ik;
-
-            ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = __instance.leftHandElbow;
-            ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 1f;
-            if (tool == null)
-            {
-                Traverse tInstance = Traverse.Create(__instance);
-                tInstance.Field("leftAim").Field("shouldAim").SetValue(false);
-                tInstance.Field("rightAim").Field("shouldAim").SetValue(false);
-
-                ik.solver.leftHandEffector.target = null;
-                ik.solver.rightHandEffector.target = null;
-                if (!VRHandsController.main.pda.isActiveAndEnabled)
+                if (!XRSettings.enabled)
                 {
-                    Transform leftWorldTarget = tInstance.Field<Transform>("leftWorldTarget").Value;
-                    if (leftWorldTarget)
-                    {
-                        ik.solver.leftHandEffector.target = leftWorldTarget;
-                        ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = null;
-                        ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 0f;
-                    }
+                    return;
+                }
 
-                    Transform rightWorldTarget = tInstance.Field<Transform>("rightWorldTarget").Value;
-                    if (rightWorldTarget)
+                Instance.Initialize(__instance);
+            }
+        }
+
+        [HarmonyPatch(typeof(ArmsController))]
+        [HarmonyPatch("Update")]
+        class ArmsController_Update_Patch
+        {
+
+            [HarmonyPostfix]
+            public static void Postfix()
+            {
+                if (!XRSettings.enabled)
+                {
+                    return;
+                }
+
+                PDA pda = Instance.pda;
+
+                Player player = Instance.player;
+
+                if ((Player.main.motorMode != Player.MotorMode.Vehicle && !player.cinematicModeActive) || pda.isActiveAndEnabled)
+                {
+                    Instance.UpdateHandPositions();
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(ArmsController))]
+        [HarmonyPatch("Reconfigure")]
+        class ArmsController_Reconfigure_Patch
+        {
+            [HarmonyPrefix]
+            public static void Prefix(ArmsController __instance, PlayerTool tool)
+            {
+                FullBodyBipedIK ik = Instance.ik;
+
+                ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = __instance.leftHandElbow;
+                ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 1f;
+                if (tool == null)
+                {
+                    Traverse tInstance = Traverse.Create(__instance);
+                    tInstance.Field("leftAim").Field("shouldAim").SetValue(false);
+                    tInstance.Field("rightAim").Field("shouldAim").SetValue(false);
+
+                    ik.solver.leftHandEffector.target = null;
+                    ik.solver.rightHandEffector.target = null;
+                    if (!Instance.pda.isActiveAndEnabled)
                     {
-                        ik.solver.rightHandEffector.target = rightWorldTarget;
-                        return;
+                        Transform leftWorldTarget = tInstance.Field<Transform>("leftWorldTarget").Value;
+                        if (leftWorldTarget)
+                        {
+                            ik.solver.leftHandEffector.target = leftWorldTarget;
+                            ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).bendGoal = null;
+                            ik.solver.GetBendConstraint(FullBodyBipedChain.LeftArm).weight = 0f;
+                        }
+
+                        Transform rightWorldTarget = tInstance.Field<Transform>("rightWorldTarget").Value;
+                        if (rightWorldTarget)
+                        {
+                            ik.solver.rightHandEffector.target = rightWorldTarget;
+                            return;
+                        }
                     }
                 }
             }
-
         }
-
     }
 }
 
